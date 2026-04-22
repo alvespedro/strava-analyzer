@@ -31,7 +31,7 @@ infra/            → external systems (Strava API, files)
 
 The golden rule: `domain/` can be tested without internet and without creating files.
 
-## Prerequisites
+## Requirements
 
 - Python 3.12+
 - A Strava account
