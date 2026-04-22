@@ -1,171 +1,173 @@
 # Strava Training Analyzer
 
-Ferramenta CLI local em Python que conecta à API do Strava, coleta seus dados de corrida e gera um relatório Markdown estruturado — projetado para ser consumido por um agente de IA que ajuda corredores a entender sua evolução e tirar dúvidas sobre os treinos.
+> 🇧🇷 [Leia em Português](README.pt-BR.md)
 
-## O que faz
+A local Python CLI tool that connects to the Strava API, collects your running data, and generates a structured Markdown report — designed to be consumed by an AI agent that helps runners understand their progress and answer questions about their training.
 
-- Autentica com sua conta do Strava via OAuth 2.0 (fluxo automático via browser)
-- Coleta corridas dos últimos N dias (padrão: 30)
-- Calcula estatísticas agregadas, tendências de pace e potência
-- Projeta tempos de prova com sistema híbrido: **Best Efforts diretos** (quando disponíveis) ou **Fórmula de Riegel** como fallback
-- Identifica corridas na **esteira vs ao ar livre**
-- Mostra **tênis utilizados** com km do período e totais acumulados
-- Exibe **splits por km** (pace + FC) de cada corrida
-- Consolida seus **melhores tempos históricos** por distância padrão (400m, 1K, 5K, 10K, Meia, Maratona)
-- Lista **segmentos Strava com PR** das corridas ao ar livre
-- Gera `report.md` pronto para ser colado num agente de IA (Claude, ChatGPT, etc.)
-- Cache local evita re-chamar a API em execuções repetidas
+## What it does
 
-## Arquitetura
+- Authenticates with your Strava account via OAuth 2.0 (automatic browser flow)
+- Collects runs from the last N days (default: 30)
+- Calculates aggregated statistics, pace and power trends
+- Projects race times using a hybrid system: **direct Best Efforts** (when available) or **Riegel Formula** as fallback
+- Identifies **treadmill vs outdoor** runs
+- Shows **shoes used** with km for the period and accumulated totals
+- Displays **per-km splits** (pace + HR) for each run
+- Consolidates your **historical best times** by standard distance (400m, 1K, 5K, 10K, Half, Marathon)
+- Lists **Strava segments with PR** from outdoor runs
+- Generates `report.md` ready to be pasted into an AI agent (Claude, ChatGPT, etc.)
+- Local cache avoids re-calling the API on repeated runs
 
-O projeto aplica **Arquitetura em Camadas** — as dependências fluem em uma única direção:
+## Architecture
+
+The project applies **Layered Architecture** — dependencies flow in one direction only:
 
 ```
-main.py           → entrada CLI (argparse)
-application/      → caso de uso único: orquestra as camadas
-domain/           → lógica pura (calculators, models) — zero dependências externas
-infra/            → sistemas externos (API Strava, arquivos)
+main.py           → CLI entry point (argparse)
+application/      → single use case: orchestrates the layers
+domain/           → pure logic (calculators, models) — zero external dependencies
+infra/            → external systems (Strava API, files)
 ```
 
-A regra de ouro: `domain/` pode ser testado sem internet e sem criar arquivos.
+The golden rule: `domain/` can be tested without internet and without creating files.
 
-## Pré-requisitos
+## Prerequisites
 
 - Python 3.12+
-- Conta no Strava
-- App criado em [strava.com/settings/api](https://www.strava.com/settings/api)
+- A Strava account
+- App created at [strava.com/settings/api](https://www.strava.com/settings/api)
   - **Authorization Callback Domain:** `localhost`
 
-## Instalação
+## Installation
 
 ```bash
-# 1. Clone o repositório
-git clone <url-do-repo>
-cd strava-first-steps
+# 1. Clone the repository
+git clone https://github.com/alvespedro/strava-analyzer.git
+cd strava-analyzer
 
-# 2. Crie e ative o ambiente virtual
+# 2. Create and activate the virtual environment
 python3 -m venv .venv
 source .venv/bin/activate  # Linux/Mac
 .venv\Scripts\activate     # Windows
 
-# 3. Instale as dependências
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Configure as credenciais
+# 4. Set up credentials
 cp .env.example .env
-# Edite .env com seu STRAVA_CLIENT_ID e STRAVA_CLIENT_SECRET
+# Edit .env with your STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET
 ```
 
-## Uso
+## Usage
 
 ```bash
-# Análise padrão (últimos 30 dias)
+# Default analysis (last 30 days)
 python3 main.py
 
-# Janela de tempo customizada
+# Custom time window
 python3 main.py --days 60
 
-# Forçar re-busca na API (ignorar cache)
+# Force API refresh (ignore cache)
 python3 main.py --refresh
 
-# Nome customizado para o relatório
-python3 main.py --output meu_relatorio.md
+# Custom report name
+python3 main.py --output my_report.md
 
-# Combinando opções
-python3 main.py --days 90 --refresh --output relatorio_trimestre.md
+# Combining options
+python3 main.py --days 90 --refresh --output q1_report.md
 ```
 
-Na **primeira execução**, o browser abrirá automaticamente para você autorizar o acesso ao Strava. Após isso, o token é salvo localmente e renovado de forma silenciosa.
+On the **first run**, the browser will open automatically for you to authorize Strava access. After that, the token is saved locally and refreshed silently.
 
-## Saída
+## Output
 
-O comando gera `report.md` com 14 seções:
+The command generates `report.md` with 14 sections:
 
-| # | Seção | Conteúdo |
-|---|-------|----------|
-| 1 | Estatísticas Gerais | Totais de km, tempo, pace médio, FC, potência, calorias, conquistas e PRs |
-| 2 | Tendência de Pace | Direção (melhorando/piorando/estável) com regressão linear |
-| 3 | Esteira vs Rua | Distribuição das corridas por superfície |
-| 4 | Tênis Utilizados | Km por tênis no período e total acumulado |
-| 5 | Projeções de Prova | 5K, 10K, Meia e Maratona — Best Effort direto ou Riegel como fallback |
-| 6 | Potência de Corrida | Média em watts e tendência (requer sensor compatível) |
-| 7 | Log de Corridas | Tabela detalhada com todas as atividades do período |
-| 8 | Breakdown Semanal | Volume e métricas agrupados por semana |
-| 9 | Corridas Notáveis | Mais longa, mais rápida, maior elevação, maior FC |
-| 10 | Carga de Treino | km/semana e consistência |
-| 11 | Best Efforts Pessoais | Melhores tempos históricos por distância padrão, com marcação de PR |
-| 12 | Segmentos Notáveis | PRs em segmentos Strava das corridas ao ar livre |
-| 13 | Splits por Km | Pace + FC de cada quilômetro de cada corrida |
-| 14 | Notas e Limitações | Contagem de atividades sem FC, cadência, splits |
+| # | Section | Content |
+|---|---------|---------|
+| 1 | General Statistics | Total km, time, average pace, HR, power, calories, achievements and PRs |
+| 2 | Pace Trend | Direction (improving/regressing/stable) with linear regression |
+| 3 | Treadmill vs Outdoor | Run distribution by surface |
+| 4 | Shoes Used | Km per shoe in the period and accumulated total |
+| 5 | Race Projections | 5K, 10K, Half Marathon and Marathon — direct Best Effort or Riegel as fallback |
+| 6 | Running Power | Average watts and trend (requires compatible sensor) |
+| 7 | Run Log | Detailed table with all activities in the period |
+| 8 | Weekly Breakdown | Volume and metrics grouped by week |
+| 9 | Notable Runs | Longest, fastest, highest elevation, highest HR |
+| 10 | Training Load | km/week and consistency |
+| 11 | Personal Best Efforts | Historical best times by standard distance, with PR flag |
+| 12 | Notable Segments | PRs on Strava segments from outdoor runs |
+| 13 | Per-km Splits | Pace + HR for each kilometer of each run |
+| 14 | Notes & Limitations | Count of activities missing HR, cadence, splits |
 
-### Sistema de projeções híbrido
+### Hybrid projection system
 
-A seção 5 usa dois métodos dependendo dos dados disponíveis:
+Section 5 uses two methods depending on available data:
 
-- **✅ Best Effort (direto)** — tempo real registrado pelo Strava nessa distância. Aparece quando você correu aquela distância continuamente (ex: uma corrida de 10K completa). É o dado mais preciso.
-- **📐 Riegel (estimado)** — projeção pela fórmula `T2 = T1 × (D2/D1)^1.06`, calculada a partir da corrida mais longa. Usado como fallback para distâncias sem Best Effort disponível.
+- **✅ Best Effort (direct)** — real time recorded by Strava for that distance. Appears when you ran that distance continuously (e.g. a complete 10K race). This is the most accurate data.
+- **📐 Riegel (estimated)** — projection using the formula `T2 = T1 × (D2/D1)^1.06`, calculated from your longest run. Used as fallback for distances without an available Best Effort.
 
-### Como usar o relatório com um agente de IA
+### How to use the report with an AI agent
 
-1. Execute `python3 main.py` para gerar o `report.md`
-2. Abra o arquivo e copie todo o conteúdo
-3. Cole numa conversa com Claude, ChatGPT ou outro agente
-4. Faça perguntas como:
-   - *"Como está minha evolução de pace?"*
-   - *"Quando devo trocar o tênis Adidas Evo SL?"*
-   - *"Meu volume semanal está adequado para uma meia maratona?"*
-   - *"Em qual km do longão meu pace cai mais?"*
-   - *"Qual foi meu melhor 5K este mês?"*
+1. Run `python3 main.py` to generate `report.md`
+2. Open the file and copy all the content
+3. Paste it into a conversation with Claude, ChatGPT, or another agent
+4. Ask questions like:
+   - *"How is my pace trending?"*
+   - *"When should I replace my shoes?"*
+   - *"Is my weekly volume adequate for a half marathon?"*
+   - *"At which km does my pace drop the most in long runs?"*
+   - *"What was my best 5K this month?"*
 
-## Estrutura de arquivos
+## File structure
 
 ```
-strava-first-steps/
-├── main.py                  # Entrada CLI
+strava-analyzer/
+├── main.py                  # CLI entry point
 ├── application/
-│   └── analyzer.py          # Caso de uso principal
+│   └── analyzer.py          # Main use case
 ├── domain/
 │   ├── models.py            # Dataclasses (Activity, Stats, Report...)
-│   └── calculators.py       # Riegel, tendências, estatísticas
+│   └── calculators.py       # Riegel, trends, statistics
 ├── infra/
 │   ├── strava_auth.py       # OAuth 2.0
-│   ├── strava_fetcher.py    # Chamadas à API do Strava
-│   ├── cache_repository.py  # Cache local (token.json)
-│   └── report_writer.py     # Geração do Markdown
+│   ├── strava_fetcher.py    # Strava API calls
+│   ├── cache_repository.py  # Local cache (token.json)
+│   └── report_writer.py     # Markdown generation
 ├── requirements.txt
 ├── .env.example
 └── .gitignore
 ```
 
-## Arquivos gerados (não versionados)
+## Generated files (not versioned)
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `.env` | Suas credenciais do Strava — **nunca commite este arquivo** |
-| `token.json` | Token OAuth e cache de atividades — regenerado automaticamente |
-| `report.md` | Relatório gerado — contém dados pessoais (FC, localização, pace real); não versionado por padrão |
+| File | Description |
+|------|-------------|
+| `.env` | Your Strava credentials — **never commit this file** |
+| `token.json` | OAuth token and activity cache — regenerated automatically |
+| `report.md` | Generated report — contains personal data (HR, location, real pace); not versioned by default |
 
-> Se quiser versionar seus relatórios, remova `report.md` do `.gitignore` e use nomes com data: `--output relatorio_2025-01.md`.
+> If you want to version your reports, remove `report.md` from `.gitignore` and use dated names: `--output report_2025-01.md`.
 
-## Dependências
+## Dependencies
 
-| Pacote | Versão | Uso |
-|--------|--------|-----|
-| `stravalib` | 1.6.0 | Wrapper da API do Strava |
-| `python-dotenv` | 1.0.0 | Leitura do arquivo `.env` |
-| `requests` | 2.31.0 | Requisições HTTP para OAuth |
+| Package | Version | Use |
+|---------|---------|-----|
+| `stravalib` | 1.6.0 | Strava API wrapper |
+| `python-dotenv` | 1.0.0 | `.env` file loading |
+| `requests` | 2.31.0 | HTTP requests for OAuth |
 
-Todo o resto (argparse, http.server, statistics, datetime) é da stdlib Python.
+Everything else (argparse, http.server, statistics, datetime) is from the Python stdlib.
 
-## Rate limits do Strava
+## Strava rate limits
 
-A API do Strava permite 100 requisições/15min e 1.000/dia. Uma execução típica usa:
+The Strava API allows 100 requests/15min and 1,000/day. A typical run uses:
 
-| Operação | Chamadas |
-|----------|----------|
-| Lista de atividades | 1 |
-| Detalhes por atividade (splits + best efforts + segmentos) | ~20–60 (1 por corrida) |
-| Resolução de tênis | 2–5 (IDs únicos) |
+| Operation | Calls |
+|-----------|-------|
+| Activity list | 1 |
+| Per-activity details (splits + best efforts + segments) | ~20–60 (1 per run) |
+| Shoe resolution | 2–5 (unique IDs) |
 | **Total** | **< 70** |
 
-O cache local evita re-chamar a API — use `--refresh` apenas quando quiser dados atualizados.
+The local cache avoids re-calling the API — use `--refresh` only when you want updated data.
